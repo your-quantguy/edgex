@@ -1,0 +1,22 @@
+# EdgeX Configuration
+# Get these from your EdgeX account settings
+
+# EdgeX Account Credentials (REQUIRED for API access)
+# Find these in your EdgeX account under "API Keys" or "Account Settings"
+EDGEX_ACCOUNT_ID=your_account_id_here
+EDGEX_STARK_PRIVATE_KEY=your_stark_private_key_here
+
+# EdgeX API Endpoints
+EDGEX_BASE_URL=https://pro.edgex.exchange
+EDGEX_WS_URL=wss://quote.edgex.exchange
+
+# For testnet, use:
+# EDGEX_BASE_URL=https://testnet.edgex.exchange
+# EDGEX_WS_URL=wss://quote-testnet.edgex.exchange
+
+# Logging
+LOG_TO_CONSOLE=true
+LOG_TO_FILE=true
+LOG_FILE=trading_log.csv
+
+TIMEZONE=Asia/Shanghai

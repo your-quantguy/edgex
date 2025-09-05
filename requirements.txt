@@ -1,0 +1,10 @@
+# EdgeX Trading Bot Dependencies
+python-dotenv>=1.0.0
+pytz>=2025.2
+asyncio
+aiohttp>=3.8.0
+websocket-client>=1.6.0
+pydantic>=1.8.0
+pycryptodome>=3.15.0
+ecdsa>=0.17.0
+requests
