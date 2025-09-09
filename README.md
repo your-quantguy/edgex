@@ -1,8 +1,23 @@
-# EdgeX Scalping Trading Bot
+# EdgeX Trading Bot
 
 A trading bot for the EdgeX exchange, built using the official EdgeX Python SDK. The bot implements an automated strategy that places orders and automatically closes them at a profit.
 
-Sample commands:
+## Referral Link
+
+Use my referral link to sign up:  
+👉 [https://pro.edgex.exchange/referral/QUANT](https://pro.edgex.exchange/referral/QUANT)
+
+By using my referral, you will enjoy the following benefits:
+
+1. **Instant VIP 1 Trading Fees** – get upgraded directly to VIP 1 fee rates.  
+2. **10% Fee Rebate** – automatically settled every 24 hours and claimable directly on the EdgeX website.  
+   - This rebate is on top of the VIP 1 fee rate, which means your effective trading fee becomes:  
+     ```
+     0.013% * 0.9 = 0.0117%
+     ```
+3. **10% Bonus Points** – extra points credited to your account.
+
+## Sample commands:
 ETH:
 python runbot.py --quantity 0.1 --take-profit 0.9 --max-orders 40 --wait-time 450
 

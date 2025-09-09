@@ -177,9 +177,32 @@ class EdgeXTradingBot:
         self.last_log_time = 0
         self.current_order_status = "PENDING"
         self.order_filled_event = asyncio.Event()
+        self.shutdown_requested = False
 
         # Register order callback
         self._setup_websocket_handlers()
+
+    async def graceful_shutdown(self, reason: str = "Unknown"):
+        """Perform graceful shutdown of the trading bot."""
+        self.logger.log(f"Starting graceful shutdown: {reason}", "INFO")
+        self.shutdown_requested = True
+        
+        try:
+            # Close HTTP client session first
+            if hasattr(self, 'client') and self.client:
+                self.logger.log("Closing HTTP client session...", "INFO")
+                await self.client.close()
+            
+            # Disconnect WebSocket connections
+            if hasattr(self, 'ws_manager'):
+                self.logger.log("Disconnecting WebSocket connections...", "INFO")
+                self.ws_manager.disconnect_all()
+            
+            self.logger.log("Graceful shutdown completed", "INFO")
+            
+        except Exception as e:
+            self.logger.log(f"Error during graceful shutdown: {e}", "ERROR")
+            self.logger.log(f"Traceback: {traceback.format_exc()}", "ERROR")
 
     def _setup_websocket_handlers(self):
         """Setup WebSocket handlers for order updates."""
@@ -488,6 +511,7 @@ class EdgeXTradingBot:
                             self.logger.log("[CLOSE] Max retries reached for close order placement", "ERROR")
                             return {'status': 'error', 'err_msg': f'Close order rejected after {max_retries} attempts'}
                     elif status in ['OPEN', 'PARTIALLY_FILLED', 'FILLED']:
+                        self.logger.log(f"[CLOSE] [{order_id}] Order placed: {quantity} @ {price}", "INFO")
                         # Order successfully placed
                         return {
                             'status': 'ok',
@@ -679,7 +703,7 @@ class EdgeXTradingBot:
                     close_price = filled_price + self.config.take_profit
                 else:
                     close_price = filled_price - self.config.take_profit
-
+                self.logger.log(f"[OPEN] [{order_id}] Order placed and FILLED: {self.config.quantity} @ {filled_price}", "INFO")
                 close_order = await self.place_close_order(
                     self.config.contract_id,
                     self.config.quantity,
@@ -707,12 +731,18 @@ class EdgeXTradingBot:
             order_info = await self.get_order_info(order_id)
             filled_amount = float(order_info['data'].get('cumFillSize', 0))
             filled_price = float(order_info['data'].get('price', 0))
+            self.logger.log(f"[OPEN] [{order_id}] Order placed and PARTIALLY FILLED: {filled_amount} @ {filled_price}", "INFO")
             if filled_amount > 0:
+                close_side = self.config.close_order_side
+                if close_side == 'sell':
+                    close_price = filled_price + self.config.take_profit
+                else:
+                    close_price = filled_price - self.config.take_profit
                 close_order = await self.place_close_order(
                     self.config.contract_id,
                     filled_amount,
-                    filled_price,
-                    self.config.close_order_side
+                    close_price,
+                    close_side
                 )
 
                 if close_order.get('status') != 'ok':
@@ -782,8 +812,15 @@ class EdgeXTradingBot:
 
                 # Check for position mismatch
                 if abs(position_amt - active_close_amount) > (2 * self.config.quantity):
-                    self.logger.log("WARNING: Position mismatch detected", "WARNING")
-                    sys.exit(1)
+                    self.logger.log("ERROR: Position mismatch detected", "ERROR")
+                    self.logger.log("###### ERROR ###### ERROR ###### ERROR ###### ERROR #####\n", "ERROR")
+                    self.logger.log("Please manually rebalance your position and take-profit orders", "ERROR")
+                    self.logger.log("请手动平衡当前仓位和正在关闭的仓位", "ERROR")
+                    self.logger.log(f"current position: {position_amt} | active closing amount: {active_close_amount}\n", "ERROR")
+                    self.logger.log("###### ERROR ###### ERROR ###### ERROR ###### ERROR #####", "ERROR")
+                    if not self.shutdown_requested:
+                        self.shutdown_requested = True
+                    return
 
             except Exception as e:
                 self.logger.log(f"Error in periodic status check: {e}", "ERROR")
@@ -800,7 +837,7 @@ class EdgeXTradingBot:
             self.ws_manager.connect_private()
 
             # Main trading loop
-            while True:
+            while not self.shutdown_requested:
                 # Update active orders
                 active_orders = await self.get_active_orders(self.config.contract_id)
 
@@ -840,12 +877,27 @@ class EdgeXTradingBot:
 
         except KeyboardInterrupt:
             self.logger.log("Bot stopped by user")
+            await self.graceful_shutdown("User interruption (Ctrl+C)")
         except Exception as e:
             self.logger.log(f"Critical error: {e}", "ERROR")
             self.logger.log(traceback.format_exc(), "ERROR")
+            await self.graceful_shutdown(f"Critical error: {e}")
             raise
         finally:
-            self.ws_manager.disconnect_all()
+            # Ensure all connections are closed even if graceful shutdown fails
+            try:
+                # Close HTTP client session
+                if hasattr(self, 'client') and self.client:
+                    await self.client.close()
+            except Exception as e:
+                self.logger.log(f"Error closing HTTP client session: {e}", "ERROR")
+            
+            try:
+                # Close WebSocket connections
+                if hasattr(self, 'ws_manager'):
+                    self.ws_manager.disconnect_all()
+            except Exception as e:
+                self.logger.log(f"Error closing WebSocket connections: {e}", "ERROR")
 
 
 def parse_arguments():
@@ -882,7 +934,12 @@ async def main():
 
     # Create and run the bot
     bot = EdgeXTradingBot(config)
-    await bot.run()
+    try:
+        await bot.run()
+    except Exception as e:
+        print(f"Bot execution failed: {e}")
+        # The bot's run method already handles graceful shutdown
+        raise
 
 
 if __name__ == "__main__":
