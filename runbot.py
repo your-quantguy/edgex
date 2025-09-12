@@ -27,12 +27,12 @@ dotenv.load_dotenv()
 @dataclass
 class TradingConfig:
     """Configuration class for trading parameters."""
-    contract_id: str = '10000002'  # EdgeX contract ID (ETH-USDT equivalent)
-    quantity: float = 0.1
-    take_profit: float = 0.9
-    direction: str = 'buy'
-    max_orders: int = 40
-    wait_time: int = 450
+    contract_id: str
+    quantity: float
+    take_profit: float
+    direction: str
+    max_orders: int
+    wait_time: int
 
     @property
     def close_order_side(self) -> str:
