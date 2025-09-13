@@ -212,13 +212,11 @@ class EdgeXTradingBot:
                 # Parse the message structure
                 if isinstance(message, str):
                     message = json.loads(message)
-
-                # Check if this is a trade-event with ORDER_UPDATE
-                if (message.get('type') == 'trade-event' and
-                        message.get('content', {}).get('event') == 'ORDER_UPDATE'):
-
+                
+                content = message.get("content", {})
+                event = content.get("event", "")
+                if event == "ORDER_UPDATE":
                     # Extract order data from the nested structure
-                    content = message.get('content', {})
                     data = content.get('data', {})
                     orders = data.get('order', [])
 
@@ -234,7 +232,11 @@ class EdgeXTradingBot:
                             order_type = "OPEN"
 
                         if status == 'FILLED':
-                            if len(data.get('collateral')):
+                            if order_type == "OPEN":
+                                self.order_filled_event.set()
+
+                            collateral = data.get('collateral', [])
+                            if collateral and len(collateral):
                                 self.logger.log(f"[{order_type}] [{order_id}] {status} "
                                                 f"{order.get('size')} @ {order.get('price')}", "INFO")
 
@@ -251,8 +253,6 @@ class EdgeXTradingBot:
                                     price=order_price,
                                     status=status
                                 )
-
-                            self.order_filled_event.set()
                         else:
                             self.logger.log(f"[{order_type}] [{order_id}] {status} "
                                             f"{order.get('size')} @ {order.get('price')}", "INFO")
@@ -266,7 +266,11 @@ class EdgeXTradingBot:
                 self.logger.log(f"Traceback: {traceback.format_exc()}", "ERROR")
 
         # Subscribe to order updates
-        self.ws_manager.subscribe_order_update(order_update_handler)
+        try:
+            private_client = self.ws_manager.get_private_client()
+            private_client.on_message("trade-event", order_update_handler)
+        except Exception as e:
+            self.logger.log(f"Could not add trade-event handler: {e}", "WARNING")
 
     async def place_open_order(self, contract_id: str, quantity: float, direction: str) -> Dict[str, Any]:
         """Place an open order with EdgeX using official SDK with retry logic for POST_ONLY rejections."""
@@ -642,7 +646,7 @@ class EdgeXTradingBot:
         elif len(self.active_close_orders) / self.config.max_orders >= 1/6:
             cool_down_time = self.config.wait_time / 2
         else:
-            cool_down_time = 60
+            cool_down_time = self.config.wait_time / 4
 
         if time.time() - self.last_open_order_time > cool_down_time:
             return 0
@@ -835,6 +839,8 @@ class EdgeXTradingBot:
             # Connect to WebSocket - only private is needed for order updates
             # self.ws_manager.connect_public()  # Removed - causes duplicate order updates
             self.ws_manager.connect_private()
+            # Wait a moment for connection to establish
+            await asyncio.sleep(2)
 
             # Main trading loop
             while not self.shutdown_requested:
