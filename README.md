@@ -1,3 +1,14 @@
+# ⚠️ Repository Deprecated / 仓库已弃用
+
+This repository is **no longer maintained**.  
+Please use the new repository instead: [👉 New Repository Link](https://github.com/your-quantguy/perp-dex-tools)
+
+---
+
+本仓库已**停止维护**。  
+请转到新的仓库使用: [👉 新仓库链接](https://github.com/your-quantguy/perp-dex-tools)
+
+
 # EdgeX Trading Bot
 
 A trading bot for the EdgeX exchange, built using the official EdgeX Python SDK. The bot implements an automated strategy that places orders and automatically closes them at a profit.
